@@ -7,16 +7,20 @@ import (
 	"net/http"
 
 	utls "github.com/refraction-networking/utls"
+	"golang.org/x/net/http2"
 )
 
-// Profile describes a browser to imitate: the exact TLS ClientHello it sends
-// plus the default request headers (and their order) it would attach.
 type Profile struct {
-	Name        string
-	ClientHello utls.ClientHelloID
-	Headers     http.Header
-	HeaderOrder []string
+	Name          string
+	ClientHello   utls.ClientHelloID
+	Headers       http.Header
+	HeaderOrder   []string
+	H2Settings    []http2.Setting
+	H2ConnWindow  uint32
+	H2PseudoOrder []string
 }
+
+func st(id http2.SettingID, v uint32) http2.Setting { return http2.Setting{ID: id, Val: v} }
 
 func hdr(pairs ...string) (http.Header, []string) {
 	h := http.Header{}
@@ -43,7 +47,10 @@ func chrome() Profile {
 		"Accept-Encoding", "gzip, deflate, br, zstd",
 		"Accept-Language", "en-US,en;q=0.9",
 	)
-	return Profile{"chrome", utls.HelloChrome_Auto, h, o}
+	return Profile{Name: "chrome", ClientHello: utls.HelloChrome_Auto, Headers: h, HeaderOrder: o,
+		H2Settings: []http2.Setting{st(http2.SettingHeaderTableSize, 65536), st(http2.SettingEnablePush, 0),
+			st(http2.SettingInitialWindowSize, 6291456), st(http2.SettingMaxHeaderListSize, 262144)},
+		H2ConnWindow: 15663105, H2PseudoOrder: []string{"m", "a", "s", "p"}}
 }
 
 func firefox() Profile {
@@ -58,7 +65,10 @@ func firefox() Profile {
 		"Sec-Fetch-Site", "none",
 		"Sec-Fetch-User", "?1",
 	)
-	return Profile{"firefox", utls.HelloFirefox_Auto, h, o}
+	return Profile{Name: "firefox", ClientHello: utls.HelloFirefox_Auto, Headers: h, HeaderOrder: o,
+		H2Settings: []http2.Setting{st(http2.SettingHeaderTableSize, 65536),
+			st(http2.SettingInitialWindowSize, 131072), st(http2.SettingMaxFrameSize, 16384)},
+		H2ConnWindow: 12517377, H2PseudoOrder: []string{"m", "p", "a", "s"}}
 }
 
 func safari() Profile {
@@ -68,7 +78,10 @@ func safari() Profile {
 		"Accept-Language", "en-US,en;q=0.9",
 		"Accept-Encoding", "gzip, deflate, br",
 	)
-	return Profile{"safari", utls.HelloSafari_Auto, h, o}
+	return Profile{Name: "safari", ClientHello: utls.HelloSafari_Auto, Headers: h, HeaderOrder: o,
+		H2Settings: []http2.Setting{st(http2.SettingMaxConcurrentStreams, 100),
+			st(http2.SettingInitialWindowSize, 4194304)},
+		H2ConnWindow: 10420225, H2PseudoOrder: []string{"m", "s", "p", "a"}}
 }
 
 func edge() Profile {
@@ -82,7 +95,10 @@ func edge() Profile {
 		"Accept-Encoding", "gzip, deflate, br, zstd",
 		"Accept-Language", "en-US,en;q=0.9",
 	)
-	return Profile{"edge", utls.HelloEdge_Auto, h, o}
+	return Profile{Name: "edge", ClientHello: utls.HelloEdge_Auto, Headers: h, HeaderOrder: o,
+		H2Settings: []http2.Setting{st(http2.SettingHeaderTableSize, 65536), st(http2.SettingEnablePush, 0),
+			st(http2.SettingInitialWindowSize, 6291456), st(http2.SettingMaxHeaderListSize, 262144)},
+		H2ConnWindow: 15663105, H2PseudoOrder: []string{"m", "a", "s", "p"}}
 }
 
 func ios() Profile {
@@ -92,7 +108,10 @@ func ios() Profile {
 		"Accept-Language", "en-US,en;q=0.9",
 		"Accept-Encoding", "gzip, deflate, br",
 	)
-	return Profile{"ios", utls.HelloIOS_Auto, h, o}
+	return Profile{Name: "ios", ClientHello: utls.HelloIOS_Auto, Headers: h, HeaderOrder: o,
+		H2Settings: []http2.Setting{st(http2.SettingMaxConcurrentStreams, 100),
+			st(http2.SettingInitialWindowSize, 2097152)},
+		H2ConnWindow: 10420225, H2PseudoOrder: []string{"m", "s", "p", "a"}}
 }
 
 // Built-in browser profiles (latest stable at release time).

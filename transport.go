@@ -2,7 +2,6 @@ package impersonate
 
 import (
 	"context"
-	"crypto/tls"
 	"net"
 	"net/http"
 	"sync"
@@ -11,10 +10,6 @@ import (
 	"golang.org/x/net/http2"
 )
 
-// roundTripper dials every connection with a uTLS ClientHello matching the
-// profile, then dispatches to an HTTP/2 or HTTP/1.1 transport based on the
-// ALPN the server negotiated. Per-host transports are cached so connection
-// pooling and keep-alive work normally.
 type roundTripper struct {
 	profile Profile
 	dialer  *net.Dialer
@@ -77,16 +72,14 @@ func (rt *roundTripper) buildTransport(ctx context.Context, addr string) (http.R
 	}
 	conn.Close()
 
+	if alpn == http2.NextProtoTLS {
+		return &h2Transport{
+			p:    rt.profile,
+			dial: func(ctx context.Context) (net.Conn, error) { return rt.dialTLS(ctx, addr) },
+		}, nil
+	}
 	dial := func(ctx context.Context, network, a string) (net.Conn, error) {
 		return rt.dialTLS(ctx, a)
-	}
-
-	if alpn == http2.NextProtoTLS {
-		return &http2.Transport{
-			DialTLSContext: func(ctx context.Context, network, a string, _ *tls.Config) (net.Conn, error) {
-				return dial(ctx, network, a)
-			},
-		}, nil
 	}
 	return &http.Transport{DialTLSContext: dial, ForceAttemptHTTP2: false}, nil
 }

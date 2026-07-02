@@ -45,24 +45,23 @@ Fingerprints measured against [tls.peet.ws](https://tls.peet.ws):
 | Firefox | `t13d1715h2_5b57614c22b0_…` | `b5001237acdf006056b409cc433726b0` |
 | Safari  | `t13d2014h2_a09f3c656075_…` | `773906b0efdefa24a7f2b8eb6985bf37` |
 
+HTTP/2 (Akamai), Chrome, measured at [tools.scrapfly.io](https://tools.scrapfly.io/api/fp/anything):
+`1:65536;2:0;4:6291456;6:262144|15663105|0|m,a,s,p` — byte-identical to Chrome.
+
 The `t13d1516h2_8daaf6152771` Chrome core (version + cipher list + ALPN + cipher
 hash) matches a genuine Chrome handshake. Profiles track uTLS's `*_Auto`
 templates, so they follow the current stable browser as uTLS updates.
 
-## Scope — what's exact and what isn't
+## Scope
 
-- ✅ **TLS ClientHello (JA3, JA4)** — byte-exact per profile. This is the primary
-  signal every major anti-bot stack fingerprints first.
+- ✅ **TLS ClientHello (JA3, JA4)** — byte-exact per profile.
+- ✅ **HTTP/2 fingerprint (Akamai)** — byte-exact: SETTINGS order + values,
+  `WINDOW_UPDATE` increment, and pseudo-header order all match the browser. A
+  custom HTTP/2 client (built on `http2.Framer` + `hpack`) emits every frame the
+  way the browser does — not Go's stack.
 - ✅ **Default headers & values** — browser-accurate.
-- ⚠️ **HTTP/2 frames (Akamai fingerprint)** — v0.1 uses Go's `x/net/http2`
-  stack, so the HTTP/2 SETTINGS/window/priority fingerprint is Go's, **not** the
-  browser's. A site that fingerprints the H2 layer can still tell. Browser-exact
-  HTTP/2 (custom SETTINGS order, `WINDOW_UPDATE`, header priority, pseudo-header
-  order) is the v0.2 roadmap.
-- ⚠️ **Header order** — best-effort; Go's transport controls final ordering.
-
-If your target only checks JA3/JA4 (the common case), v0.1 is enough. If it also
-scores the HTTP/2 fingerprint, wait for v0.2 or combine with a browser.
+- ⚠️ **Header order** — pseudo-headers are exact; regular-header order is
+  best-effort (profile order first, then extras).
 
 ## How it works
 

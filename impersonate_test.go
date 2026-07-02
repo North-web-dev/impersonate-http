@@ -51,3 +51,12 @@ func TestNewByNameUnknown(t *testing.T) {
 		t.Fatal("unknown profile should return false")
 	}
 }
+
+func TestH2FingerprintSet(t *testing.T) {
+	for _, n := range []string{"chrome", "firefox", "safari", "edge", "ios"} {
+		p := Profiles[n]
+		if len(p.H2Settings) == 0 || p.H2ConnWindow == 0 || len(p.H2PseudoOrder) != 4 {
+			t.Fatalf("profile %q missing HTTP/2 fingerprint", n)
+		}
+	}
+}
