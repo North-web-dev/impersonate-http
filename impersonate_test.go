@@ -60,3 +60,10 @@ func TestH2FingerprintSet(t *testing.T) {
 		}
 	}
 }
+
+func TestDialerMethodExists(t *testing.T) {
+	// bad address should error, not panic — verifies the dialer path
+	if _, err := Chrome.Dial("tcp", "127.0.0.1:1"); err == nil {
+		t.Fatal("expected error dialing closed port")
+	}
+}

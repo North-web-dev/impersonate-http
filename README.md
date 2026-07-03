@@ -63,6 +63,36 @@ templates, so they follow the current stable browser as uTLS updates.
 - ⚠️ **Header order** — pseudo-headers are exact; regular-header order is
   best-effort (profile order first, then extras).
 
+## WebSocket
+
+The same TLS fingerprint works for `wss://` — plug the profile's dialer into any
+WebSocket client:
+
+```go
+// coder/websocket
+websocket.Dial(ctx, "wss://host/path", &websocket.DialOptions{
+    HTTPClient: &http.Client{Transport: impersonate.NewTransport(impersonate.Chrome)},
+})
+
+// gorilla/websocket
+d := websocket.Dialer{NetDialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+    return impersonate.Chrome.DialTLSContext(ctx, network, addr)
+}}
+```
+
+## Related
+
+- **[fingerprint-db](https://github.com/North-web-dev/fingerprint-db)** — the
+  measured JA3/JA4/Akamai fingerprints these profiles reproduce (JSON + loaders).
+- **[fpcheck](https://github.com/North-web-dev/fpcheck)** — self-hosted rig to
+  read your own JA3/JA4/JA4H + HTTP/2 fingerprint.
+
+## Roadmap
+
+- HTTP/3 (QUIC) ClientHello impersonation.
+- Profile auto-update sourced from `fingerprint-db`.
+- More browser variants (Android Chrome, Firefox ESR, Opera/Brave).
+
 ## How it works
 
 Each connection is dialed with [uTLS](https://github.com/refraction-networking/utls):
