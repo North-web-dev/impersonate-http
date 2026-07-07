@@ -1,5 +1,11 @@
 # impersonate-http
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/North-web-dev/impersonate-http.svg)](https://pkg.go.dev/github.com/North-web-dev/impersonate-http)
+[![CI](https://github.com/North-web-dev/impersonate-http/actions/workflows/ci.yml/badge.svg)](https://github.com/North-web-dev/impersonate-http/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/North-web-dev/impersonate-http)](https://goreportcard.com/report/github.com/North-web-dev/impersonate-http)
+![Go version](https://img.shields.io/github/go-mod/go-version/North-web-dev/impersonate-http)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A Go `http.Client` whose **TLS handshake is byte-identical to a real browser's**,
 so requests survive **JA3 / JA4 fingerprinting** (Cloudflare, Akamai, DataDome,
 PerimeterX, …) — no headless browser, no CGo, no curl.
@@ -19,9 +25,9 @@ go get github.com/North-web-dev/impersonate-http
 
 ## Profiles
 
-`Chrome`, `Firefox`, `Safari`, `Edge`, `IOS` — each sets the matching uTLS
-ClientHello **and** the browser's default headers (User-Agent, `sec-ch-ua`,
-`Accept`, `Sec-Fetch-*`, …). Look one up by name:
+`Chrome`, `ChromeAndroid`, `Firefox`, `Safari`, `Edge`, `IOS` — each sets the
+matching uTLS ClientHello **and** the browser's default headers (User-Agent,
+`sec-ch-ua`, `Accept`, `Sec-Fetch-*`, …). Look one up by name:
 
 ```go
 client, ok := impersonate.NewByName("firefox")
@@ -34,6 +40,20 @@ c := &http.Client{Transport: impersonate.NewTransport(impersonate.Safari)}
 ```
 
 Caller-set headers are never overwritten by a profile's defaults.
+
+## Proxy
+
+Route through a `socks5://` or `http(s)://` proxy (with optional credentials):
+
+```go
+client := impersonate.New(impersonate.Chrome,
+    impersonate.WithProxy("http://user:pass@host:8080"),
+    impersonate.WithTimeout(20*time.Second),
+)
+```
+
+`WithDialer` accepts any custom dialer if you need full control; `ProxyDialer`
+exposes the proxy dial function on its own.
 
 ## Verified
 
@@ -80,6 +100,43 @@ d := websocket.Dialer{NetDialTLSContext: func(ctx context.Context, network, addr
 }}
 ```
 
+## HTTP API
+
+`cmd/serve` wraps the library in a language-agnostic fetch API — POST a URL and a
+profile, get back the response fetched with that browser's exact fingerprint.
+Handy when the rest of your stack isn't Go.
+
+```
+go run ./cmd/serve -addr :8080
+# or: docker build -t impersonate . && docker run -p 8080:8080 impersonate
+```
+
+```bash
+curl -s localhost:8080/fetch -d '{
+  "url": "https://example.com",
+  "profile": "chrome",
+  "proxy": "http://user:pass@host:8080"
+}'
+# -> {"status":200,"final_url":"...","headers":{...},"body":"<!doctype html>...","elapsed_ms":812}
+```
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /fetch` | Fetch `url` with a profile. Fields: `profile`, `method`, `headers`, `body`, `proxy`, `timeout_ms`, `follow_redirects`. `br`/`zstd`/`gzip` bodies are decoded for you. |
+| `GET /profiles` | List available profiles. |
+| `GET /usage` | Caller's rate/quota usage (does not count against it). |
+| `GET /healthz` | Liveness. |
+
+**Auth & quotas** are optional. Pass a single key with `-key`, or a plans file
+with `-keys keys.json` for per-key rate limits and daily quotas:
+
+```json
+[{"key": "acme-key", "name": "acme", "rps": 5, "daily": 10000}]
+```
+
+Present the key as `Authorization: Bearer <key>` or `X-API-Key: <key>`. Without
+either flag the API is open.
+
 ## Related
 
 - **[fingerprint-db](https://github.com/North-web-dev/fingerprint-db)** — the
@@ -91,7 +148,7 @@ d := websocket.Dialer{NetDialTLSContext: func(ctx context.Context, network, addr
 
 - HTTP/3 (QUIC) ClientHello impersonation.
 - Profile auto-update sourced from `fingerprint-db`.
-- More browser variants (Android Chrome, Firefox ESR, Opera/Brave).
+- More browser variants (Firefox ESR, Opera/Brave).
 
 ## How it works
 

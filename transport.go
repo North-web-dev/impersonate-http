@@ -12,16 +12,19 @@ import (
 
 type roundTripper struct {
 	profile Profile
-	dialer  *net.Dialer
+	dial    DialFunc
 
 	mu         sync.Mutex
 	transports map[string]http.RoundTripper
 }
 
-func newRoundTripper(p Profile) *roundTripper {
+func newRoundTripper(p Profile, dial DialFunc) *roundTripper {
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
 	return &roundTripper{
 		profile:    p,
-		dialer:     &net.Dialer{},
+		dial:       dial,
 		transports: map[string]http.RoundTripper{},
 	}
 }
@@ -31,7 +34,7 @@ func (rt *roundTripper) dialTLS(ctx context.Context, addr string) (net.Conn, err
 	if err != nil {
 		host, addr = addr, net.JoinHostPort(addr, "443")
 	}
-	raw, err := rt.dialer.DialContext(ctx, "tcp", addr)
+	raw, err := rt.dial(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
 	}

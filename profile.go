@@ -101,6 +101,27 @@ func edge() Profile {
 		H2ConnWindow: 15663105, H2PseudoOrder: []string{"m", "a", "s", "p"}}
 }
 
+func chromeAndroid() Profile {
+	h, o := hdr(
+		"sec-ch-ua", `"Not(A:Brand";v="99", "Google Chrome";v="131", "Chromium";v="131"`,
+		"sec-ch-ua-mobile", "?1",
+		"sec-ch-ua-platform", `"Android"`,
+		"Upgrade-Insecure-Requests", "1",
+		"User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+		"Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+		"Sec-Fetch-Site", "none",
+		"Sec-Fetch-Mode", "navigate",
+		"Sec-Fetch-User", "?1",
+		"Sec-Fetch-Dest", "document",
+		"Accept-Encoding", "gzip, deflate, br, zstd",
+		"Accept-Language", "en-US,en;q=0.9",
+	)
+	return Profile{Name: "chrome_android", ClientHello: utls.HelloChrome_Auto, Headers: h, HeaderOrder: o,
+		H2Settings: []http2.Setting{st(http2.SettingHeaderTableSize, 65536), st(http2.SettingEnablePush, 0),
+			st(http2.SettingInitialWindowSize, 6291456), st(http2.SettingMaxHeaderListSize, 262144)},
+		H2ConnWindow: 15663105, H2PseudoOrder: []string{"m", "a", "s", "p"}}
+}
+
 func ios() Profile {
 	h, o := hdr(
 		"User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
@@ -116,14 +137,16 @@ func ios() Profile {
 
 // Built-in browser profiles (latest stable at release time).
 var (
-	Chrome  = chrome()
-	Firefox = firefox()
-	Safari  = safari()
-	Edge    = edge()
-	IOS     = ios()
+	Chrome        = chrome()
+	ChromeAndroid = chromeAndroid()
+	Firefox       = firefox()
+	Safari        = safari()
+	Edge          = edge()
+	IOS           = ios()
 )
 
 // Profiles maps names to profiles for lookup by string.
 var Profiles = map[string]Profile{
-	"chrome": Chrome, "firefox": Firefox, "safari": Safari, "edge": Edge, "ios": IOS,
+	"chrome": Chrome, "chrome_android": ChromeAndroid, "firefox": Firefox,
+	"safari": Safari, "edge": Edge, "ios": IOS,
 }

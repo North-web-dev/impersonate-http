@@ -20,7 +20,7 @@ import (
 //	    return impersonate.Chrome.DialTLSContext(ctx, network, addr)
 //	}}
 func (p Profile) DialTLSContext(ctx context.Context, network, addr string) (net.Conn, error) {
-	return newRoundTripper(p).dialTLS(ctx, addr)
+	return newRoundTripper(p, nil).dialTLS(ctx, addr)
 }
 
 // Dial is DialTLSContext with a background context.
