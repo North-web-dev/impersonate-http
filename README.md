@@ -221,6 +221,20 @@ and pseudo-header order.
 - **[fpcheck](https://github.com/North-web-dev/fpcheck)** — self-hosted rig to read
   your own JA3/JA4/JA4H + HTTP/2 fingerprint.
 
+## Support
+
+If this project saves you time, you can support development:
+
+⭐ Star the repo if it helped.
+
+| Coin | Address |
+|---|---|
+| **BTC** | `bc1q0sfghv7yfl594gjurhyhlhdgm0dtwh4dkjha36` |
+| **ETH / USDT-ERC20 / BNB-BEP20** | `0xB827b5a8B6c5111946c5D872933b2C23484E87dE` |
+| **SOL** | `3ch5aHrPp3CierhiNXmqmtFH2dMHh6Gfv7a97KtLMMCh` |
+| **USDT-TRC20 / TRX** | `TUAyz7TjgJdFVD2oFHWUUTNrzzAnBRgySG` |
+| **TON** | `UQAJmYVuR3hh02etjaPKJF-h6jcpdSnq9ZIFvI64NEskS6tx` |
+
 ## Disclaimer
 
 Provided **as is, without warranty of any kind**, for lawful automation, testing, and
