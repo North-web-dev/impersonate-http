@@ -78,24 +78,65 @@ exposes the proxy dial function on its own.
 
 ## Measured fingerprints (parity table)
 
-Captured with `go run ./cmd/measure` against [tls.peet.ws/api/all](https://tls.peet.ws)
-on **2026-10-25**, uTLS **v1.8.2**. These are real, reproducible measurements — run
-`cmd/measure` yourself to regenerate them.
+Captured with `go run ./cmd/measure` on **2026-10-25**, uTLS **v1.8.2**, against two
+independent reflectors — [tls.peet.ws/api/all](https://tls.peet.ws) and our own
+`https://fp.shshbshsnang.shop/api/all`. Both reflectors observed the **same** Akamai
+h2 string for every profile, so the values below are what the client really puts on
+the wire, not canned constants. Run `cmd/measure` yourself to regenerate them:
 
-| Profile | JA4 (stable identifier) | JA3 hash | JA3 stable? | HTTP/2 (Akamai) |
-| --- | --- | --- | --- | --- |
-| chrome  | `t13d1516h2_8daaf6152771_d8a2da3f94cd` | varies per connection | no — by design | `1:65536;2:0;4:6291456;6:262144\|15663105\|0\|m,a,s,p` |
-| edge    | `t13d1515h2_8daaf6152771_de4a06bb82e3` | `b32309a26951912be7dba376398abc3b` | yes* | `1:65536;2:0;4:6291456;6:262144\|15663105\|0\|m,a,s,p` |
-| firefox | `t13d1715h2_5b57614c22b0_5c2c66f702b0` | `b5001237acdf006056b409cc433726b0` | yes | `1:65536;4:131072;5:16384\|12517377\|0\|m,p,a,s` |
-| safari  | `t13d2014h2_a09f3c656075_14788d8d241b` | `773906b0efdefa24a7f2b8eb6985bf37` | yes | `3:100;4:4194304\|10420225\|0\|m,s,p,a` |
-| ios     | `t13d2613h2_2802a3db6c62_845d286b0d67` | `656b9a2f4de6ed4909e157482860ab3d` | yes | `3:100;4:2097152\|10420225\|0\|m,s,p,a` |
+```
+go run ./cmd/measure                                          # tls.peet.ws
+go run ./cmd/measure -url https://fp.shshbshsnang.shop/api/all # second reflector
+```
+
+### TLS (JA3 / JA4)
+
+| Profile | JA4 (stable identifier) | JA3 hash | JA3 stable? |
+| --- | --- | --- | --- |
+| chrome  | `t13d1516h2_8daaf6152771_d8a2da3f94cd` | varies per connection | no — by design |
+| edge    | `t13d1515h2_8daaf6152771_de4a06bb82e3` | `b32309a26951912be7dba376398abc3b` | yes* |
+| firefox | `t13d1715h2_5b57614c22b0_5c2c66f702b0` | `b5001237acdf006056b409cc433726b0` | yes |
+| safari  | `t13d2014h2_a09f3c656075_14788d8d241b` | `773906b0efdefa24a7f2b8eb6985bf37` | yes |
+| ios     | `t13d2613h2_2802a3db6c62_845d286b0d67` | `656b9a2f4de6ed4909e157482860ab3d` | yes |
 
 **JA4 is the fingerprint to match on, not JA3.** Chrome shuffles its TLS extension
 order on every connection (Chromium ≥ 110), so its JA3 hash is non-deterministic —
 exactly like a real Chrome. JA4 sorts extensions, so it is stable; the cipher core
 (`8daaf6152771` Chrome/Edge, `5b57614c22b0` Firefox, `a09f3c656075` Safari) matches
-the published desktop-browser values, and the HTTP/2 Akamai fingerprint is byte-exact
-per profile.
+the published desktop-browser values.
+
+### HTTP/2 (Akamai) — measured vs. canonical browser
+
+The Akamai h2 string is `SETTINGS | WINDOW_UPDATE | PRIORITY | pseudo-header-order`.
+"Measured" is what the two reflectors reported our client emitted; "canonical" is the
+published value for that browser. The client is driven at the frame level
+(`http2.Framer` + `hpack`) — it writes the client preface, the browser's SETTINGS in
+the browser's order, the connection `WINDOW_UPDATE`, and HEADERS with the browser's
+pseudo-header order; it does **not** use Go's `net/http2` default SETTINGS.
+
+| Profile | Measured (both reflectors) | Canonical target | Match? |
+| --- | --- | --- | --- |
+| chrome          | `1:65536;2:0;4:6291456;6:262144\|15663105\|0\|m,a,s,p` | `1:65536;2:0;4:6291456;6:262144\|15663105\|0\|m,a,s,p` | ✅ exact |
+| edge            | `1:65536;2:0;4:6291456;6:262144\|15663105\|0\|m,a,s,p` | same as Chrome (Chromium) | ✅ exact |
+| chrome_android  | `1:65536;2:0;4:6291456;6:262144\|15663105\|0\|m,a,s,p` | same as Chrome (Chromium) | ✅ exact |
+| firefox         | `1:65536;4:131072;5:16384\|12517377\|0\|m,p,a,s`       | `1:65536;4:131072;5:16384\|12517377\|0\|m,p,a,s`       | ✅ exact |
+| safari          | `3:100;4:4194304\|10420225\|0\|m,s,p,a`                | `…;3:100;4:4194304;…\|…\|0\|m,s,p,a`                   | ✅ values & order, see † |
+| ios             | `3:100;4:2097152\|10420225\|0\|m,s,p,a`                | `…;3:100;4:2097152;…\|…\|0\|m,s,p,a`                   | ✅ values & order, see † |
+
+Chrome/Edge/Chrome-Android and Firefox reproduce the canonical desktop values
+**byte-for-byte** (the Chrome string is the textbook Chromium 131 fingerprint). These
+are high-confidence exact matches.
+
+`†` **Safari / iOS caveat (honest):** the SETTINGS *values* present
+(`MAX_CONCURRENT_STREAMS=100`, `INITIAL_WINDOW_SIZE` 4 MiB desktop / 2 MiB iOS) and the
+pseudo-header order (`m,s,p,a`) are correct for WebKit, and the string is stable across
+both reflectors. But public fingerprint databases disagree on two details for Safari —
+the SETTINGS *ordering* (some list `4:…;3:100`, we emit `3:100;4:…`) and the exact
+connection `WINDOW_UPDATE` increment (`10420225` vs. `10485760`). We did **not**
+capture from a real Safari/iOS device in this measurement, so treat these two profiles
+as "matches a widely-used WebKit fingerprint" rather than "verified byte-identical to a
+specific OS build." If you need guaranteed Safari parity, capture your target build and
+compare.
 
 `*` **Edge caveat:** real Edge 131 permutes extensions like Chrome, but uTLS's
 `HelloEdge_Auto` preset does not, so the Edge ClientHello is close (correct TLS
@@ -111,10 +152,13 @@ Does:
 
 - **TLS ClientHello (JA3 / JA4)** — byte-exact per profile, via uTLS. For Chrome
   this includes the per-connection extension shuffle.
-- **HTTP/2 fingerprint (Akamai)** — byte-exact: SETTINGS order + values,
-  `WINDOW_UPDATE` increment, and pseudo-header order all match the browser. A custom
-  HTTP/2 client (built on `http2.Framer` + `hpack`) emits every frame the way the
-  browser does — not Go's `net/http` stack.
+- **HTTP/2 fingerprint (Akamai)** — SETTINGS order + values, `WINDOW_UPDATE`
+  increment, and pseudo-header order are driven at the frame level, **not** Go's
+  `net/http2` defaults. A custom HTTP/2 client (built on `http2.Framer` + `hpack`)
+  emits every frame the way the browser does. Chrome/Edge/Chrome-Android and Firefox
+  match the canonical browser string byte-for-byte (verified against two reflectors,
+  and against fixed expected bytes in the unit tests); Safari/iOS match a widely-used
+  WebKit fingerprint with the documented caveat above.
 - **Default headers & values** — browser-accurate, injected only when the caller
   did not set them.
 
@@ -141,6 +185,14 @@ Does not:
   This library is that wiring, packaged as a drop-in `http.Client`.
 
 Neither this library nor curl_cffi runs a headless browser.
+
+**Prior art.** The frame-level approach to the Akamai HTTP/2 fingerprint — writing the
+preface, browser-exact SETTINGS, `WINDOW_UPDATE` and pseudo-header order directly over
+a uTLS connection — follows the ground opened by
+[utls](https://github.com/refraction-networking/utls),
+[curl_cffi](https://github.com/lexiforest/curl_cffi), and Go tools such as
+cloudscraper-style HTTP/2 clients and httpcloak. This library's contribution is
+packaging it as a stock `*http.Client`.
 
 ## WebSocket
 
@@ -215,7 +267,11 @@ and pseudo-header order.
 ## Reproduce the measurements
 
 - **[cmd/measure](cmd/measure)** — in this repo; captures the JA3/JA4/Akamai this
-  library emits per profile against `tls.peet.ws`.
+  library emits per profile. Defaults to `tls.peet.ws`; pass `-url` (or set
+  `REFLECTOR_URL`) to point at any reflector that returns an `akamai` h2 string.
+- **Unit tests** — `http2_wire_test.go` asserts the exact SETTINGS / `WINDOW_UPDATE`
+  bytes and the HEADERS pseudo-header order the client writes, against fixed
+  byte-level expectations (no network needed).
 - **[fingerprint-db](https://github.com/North-web-dev/fingerprint-db)** — the
   measured JA3/JA4/Akamai fingerprints these profiles reproduce (JSON + loaders).
 - **[fpcheck](https://github.com/North-web-dev/fpcheck)** — self-hosted rig to read
