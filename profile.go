@@ -10,13 +10,28 @@ import (
 	"golang.org/x/net/http2"
 )
 
+// Profile describes one browser's full network fingerprint: its uTLS
+// ClientHello (JA3/JA4), its default request headers, and its HTTP/2 framing
+// (Akamai) fingerprint. Use the built-in values (Chrome, Firefox, …) rather
+// than constructing one by hand.
 type Profile struct {
-	Name          string
-	ClientHello   utls.ClientHelloID
-	Headers       http.Header
-	HeaderOrder   []string
-	H2Settings    []http2.Setting
-	H2ConnWindow  uint32
+	// Name is the lookup key used by NewByName and the Profiles map.
+	Name string
+	// ClientHello selects the uTLS template that produces the TLS handshake.
+	ClientHello utls.ClientHelloID
+	// Headers are the browser's default request headers, injected only when
+	// the caller has not already set them.
+	Headers http.Header
+	// HeaderOrder is the order regular (non-pseudo) headers are emitted in on
+	// HTTP/2; headers not listed follow in map order.
+	HeaderOrder []string
+	// H2Settings is the HTTP/2 SETTINGS frame, in the browser's exact order.
+	H2Settings []http2.Setting
+	// H2ConnWindow is the connection-level WINDOW_UPDATE increment the browser
+	// sends after SETTINGS (0 to send none).
+	H2ConnWindow uint32
+	// H2PseudoOrder is the order of the :method/:authority/:scheme/:path
+	// pseudo-headers, as single letters ("m","a","s","p").
 	H2PseudoOrder []string
 }
 
